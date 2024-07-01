@@ -1,6 +1,6 @@
 aiogram
 openai-async
-whisper-async
+whisper
 pydantic
 python-dotenv
 redis
