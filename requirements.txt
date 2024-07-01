@@ -3,3 +3,4 @@ openai-async
 pydantic
 python-dotenv
 redis
+loguru
