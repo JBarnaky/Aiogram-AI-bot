@@ -49,7 +49,7 @@ async def get_answer(question: str) -> str:
         return cached_response.decode("utf-8")
 
     response = await assistant.create(
-        model="gpt-3.5-turbo", input=question, max_tokens=1024
+        model="gpt-3.5-turbo-0125", input=question, max_tokens=1024
     )
     answer = response.output.text
 
