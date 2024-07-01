@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandObject
 from aiogram.types import InputMediaAudio
-from openai_async import Client, AsyncCompletion, AsyncChatCompletion
+from openai_async import AsyncClient, AsyncAssistant
 from whisper.async_transcribe import AsyncTranscriber
 from redis import asyncio as aioredis
 from pydantic import BaseSettings
@@ -25,7 +25,8 @@ settings = Settings()
 # Initialize the Telegram bot, OpenAI API client, Whisper transcriber, and Redis connection
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
-openai = Client(settings.OPENAI_API_KEY)
+openai = AsyncClient(settings.OPENAI_API_KEY)
+assistant = openai.assistant
 whisper = AsyncTranscriber()
 redis = aioredis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
 
@@ -46,10 +47,10 @@ async def get_answer(question: str) -> str:
     if cached_response:
         return cached_response.decode("utf-8")
 
-    completion = await openai.chat.completions.create(
-        model="gpt-3.5-turbo", messages=[{"role": "user", "content": question}]
+    response = await assistant.create(
+        model="gpt-3.5-turbo", input=question, max_tokens=1024
     )
-    answer = completion.choices[0].message.content
+    answer = response.output.text
 
     # Cache the response in Redis
     await redis.set(redis_key, answer, ex=3600)  # Cache for 1 hour
