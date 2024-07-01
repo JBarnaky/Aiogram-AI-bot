@@ -5,7 +5,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command, CommandObject
 from aiogram.types import InputMediaAudio
 from openai_async import AsyncClient, AsyncAssistant
-from whisper.async_transcribe import AsyncTranscriber
+from whisper_api import WhisperAPI
 from redis import asyncio as aioredis
 from pydantic import BaseSettings
 from loguru import logger
@@ -17,17 +17,18 @@ load_dotenv()
 class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = os.environ.get("TELEGRAM_BOT_TOKEN")
     OPENAI_API_KEY: str = os.environ.get("OPENAI_API_KEY")
+    WHISPER_API_KEY: str = os.environ.get("WHISPER_API_KEY")
     REDIS_HOST: str = os.environ.get("REDIS_HOST", "localhost")
     REDIS_PORT: int = int(os.environ.get("REDIS_PORT", 6379))
 
 settings = Settings()
 
-# Initialize the Telegram bot, OpenAI API client, Whisper transcriber, and Redis connection
+# Initialize the Telegram bot, OpenAI API client, Whisper API client, and Redis connection
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
 openai = AsyncClient(settings.OPENAI_API_KEY)
 assistant = openai.assistant
-whisper = AsyncTranscriber()
+whisper = WhisperAPI(settings.WHISPER_API_KEY)
 redis = aioredis.from_url(f"redis://{settings.REDIS_HOST}:{settings.REDIS_PORT}")
 
 # Function to get a unique key for Redis caching
@@ -68,7 +69,7 @@ async def handle_voice(message: types.Message):
     voice_file = await bot.get_file(message.voice.file_id)
     voice_path = voice_file.file_path
 
-    # Transcribe the voice message using Whisper
+    # Transcribe the voice message using Whisper API
     transcription = await whisper.transcribe(voice_path)
     question = transcription["text"]
 
