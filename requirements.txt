@@ -1,7 +1,7 @@
+python-dotenv
 aiogram
 openai-async
 whisper-api
-pydantic
-python-dotenv
 redis
+pydantic
 loguru
