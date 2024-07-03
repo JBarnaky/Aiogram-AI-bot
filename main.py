@@ -37,8 +37,12 @@ def get_redis_key(message_id: int) -> str:
 
 # Function to voice the text using OpenAI TTS API
 async def voice_text(text: str) -> InputMediaAudio:
-    response = await openai.audio.speech.create(model="tts-1", text=text)
-    return InputMediaAudio(media=response["audio_content"], caption=text)
+    try:
+        response = await openai.audio.speech.create(model="tts-1", text=text)
+        return InputMediaAudio(media=response["audio_content"], caption=text)
+    except Exception as e:
+        logger.error(f"Error voicing text: {e}")
+        return None
 
 # Function to get answers from OpenAI Assistant API
 async def get_answer(question: str) -> str:
@@ -48,39 +52,57 @@ async def get_answer(question: str) -> str:
     if cached_response:
         return cached_response.decode("utf-8")
 
-    response = await assistant.create(
-        model="gpt-3.5-turbo-0125", input=question, max_tokens=1024
-    )
-    answer = response.output.text
+    try:
+        response = await assistant.create(
+            model="gpt-3.5-turbo-0125", input=question, max_tokens=1024
+        )
+        answer = response.output.text
 
-    # Cache the response in Redis
-    await redis.set(redis_key, answer, ex=3600)  # Cache for 1 hour
+        # Cache the response in Redis
+        await redis.set(redis_key, answer, ex=3600)  # Cache for 1 hour
 
-    return answer
+        return answer
+    except Exception as e:
+        logger.error(f"Error getting answer: {e}")
+        return "Sorry, I couldn't understand that."
 
 # Command handler for '/start' command
 @dp.message(Command("start"))
 async def start(message: types.Message, command: CommandObject):
-    await message.reply("Hi! Send me a voice message to get started.")
+    try:
+        await message.reply("Hi! Send me a voice message to get started.")
+    except Exception as e:
+        logger.error(f"Error sending start message: {e}")
 
 # Message handler for voice messages
 @dp.message(types.Voice)
 async def handle_voice(message: types.Message):
-    voice_file = await bot.get_file(message.voice.file_id)
-    voice_path = voice_file.file_path
+    try:
+        voice_file = await bot.get_file(message.voice.file_id)
+        voice_path = voice_file.file_path
 
-    # Transcribe the voice message using Whisper API
-    transcription = await whisper.transcribe(voice_path)
-    question = transcription["text"]
+        # Transcribe the voice message using Whisper API
+        try:
+            transcription = await whisper.transcribe(voice_path)
+            question = transcription["text"]
+        except Exception as e:
+            logger.error(f"Error transcribing voice message: {e}")
+            await message.reply("Sorry, I couldn't transcribe your voice message.")
+            return
 
-    # Get the answer to the question from OpenAI Assistant API
-    answer = await get_answer(question)
+        # Get the answer to the question from OpenAI Assistant API
+        answer = await get_answer(question)
 
-    # Voice the answer using OpenAI TTS API
-    voice = await voice_text(answer)
+        # Voice the answer using OpenAI TTS API
+        voice = await voice_text(answer)
 
-    # Send the voice response to the user
-    await message.answer_audio(voice.media, caption=answer)
+        if voice:
+            # Send the voice response to the user
+            await message.answer_audio(voice.media, caption=answer)
+        else:
+            await message.reply("Sorry, I couldn't voice the answer.")
+    except Exception as e:
+        logger.error(f"Error handling voice message: {e}")
 
 if __name__ == "__main__":
     logger.add("debug.log", level="DEBUG")
